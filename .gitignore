@@ -1,3 +1,8 @@
+# Do not track any datasets
+*.csv
+*.xml
+*.tsv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
