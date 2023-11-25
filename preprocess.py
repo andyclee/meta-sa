@@ -40,7 +40,9 @@ def clean_content(txt):
 def map_sentiment(sent, sentmap):
 
     # -1 for negative, 0 for neutral, 1 for positive
-    return sentmap[sent]
+    if sent in sentmap:
+        return sentmap[sent]
+    return None
 
 def process(fname, lang, setname, sentmap):
 
@@ -53,9 +55,24 @@ def process(fname, lang, setname, sentmap):
     with open(fname, 'r') as fcsv:
         csvreader = csv.reader(fcsv)
         for row in csvreader:
-            out_writer.writerow( [ clean_content(row[0]), map_sentiment(row[1], sentmap) ] )
+            clean_text = clean_content(row[0])
+            sent_lbl = map_sentiment(row[1], sentmap)
+
+            # Skip labels like NONE
+            if sent_lbl is None:
+                continue
+            out_writer.writerow( [ clean_text, sent_lbl ] )
 
     out_fo.close()
+
+def proc_dir(dirname, sentmap):
+    for ef in os.listdir(dirname):
+        if ef == '.placeholder':
+            continue
+        print('cleaning', ef)
+        lang_set, ext = ef.split('.')
+        lang, dset = lang_set.split('_')
+        process(os.path.join(dirname, ef), lang, dset, sentmap)
 
 if __name__ == '__main__':
 
@@ -63,10 +80,15 @@ if __name__ == '__main__':
     eng_dir = os.path.join(data_dir, 'en')
 
     eng_sentmap = { '0' : -1, '2' : 0, '4' : 1 }
+    proc_dir(eng_dir, eng_sentmap)
 
-    for ef in os.listdir(eng_dir):
-        print('cleaning', ef)
-        lang_set, ext = ef.split('.')
-        lang, dset = lang_set.split('_')
-        process(os.path.join(eng_dir, ef), lang, dset, eng_sentmap)
+    # Now the Spanish data
+    es_dir = os.path.join(data_dir, 'es')
+    es_sentmap = { 'N' : -1, 'NEU' : 0, 'P' : 1 }
+    proc_dir(es_dir, es_sentmap)
+
+    # Now the African data
+    afr_dir = os.path.join(data_dir, 'afr')
+    afr_sentmap = { 'negative' : -1, 'neutral' : 0, 'positive' : 1 }
+    proc_dir(afr_dir, afr_sentmap)
 
