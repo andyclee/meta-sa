@@ -17,5 +17,8 @@ for lang in os.listdir(data_dir):
             next(set_reader, None)
             out_writer = csv.writer(outf, delimiter=',')
             for row in set_reader:
-                out_writer.writerow([row[0], row[1]])
+                if lang == 'orm':
+                    out_writer.writerow([row[1], row[2]])
+                else:
+                    out_writer.writerow([row[0], row[1]])
         outf.close()

@@ -49,7 +49,7 @@ def process(fname, lang, setname, sentmap):
     # Process the data at fname
 
     out_fn = 'clean_{l}_{s}.csv'.format(l=lang, s=setname)
-    out_fo = open('data/' + out_fn, 'w+') 
+    out_fo = open(os.path.join(data_dir, out_fn), 'w+') 
     out_writer = csv.writer(out_fo, delimiter=',')
 
     with open(fname, 'r') as fcsv:
@@ -80,12 +80,12 @@ if __name__ == '__main__':
     eng_dir = os.path.join(data_dir, 'en')
 
     eng_sentmap = { '0' : -1, '2' : 0, '4' : 1 }
-    proc_dir(eng_dir, eng_sentmap)
+    #proc_dir(eng_dir, eng_sentmap)
 
     # Now the Spanish data
     es_dir = os.path.join(data_dir, 'es')
     es_sentmap = { 'N' : -1, 'NEU' : 0, 'P' : 1 }
-    proc_dir(es_dir, es_sentmap)
+    #proc_dir(es_dir, es_sentmap)
 
     # Now the African data
     afr_dir = os.path.join(data_dir, 'afr')
