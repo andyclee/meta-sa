@@ -15,7 +15,7 @@ if __name__ == '__main__':
     # Otherwise retrain
     cache_models = True
 
-    data_dir = 'test_data'
+    data_dir = 'data'
     emb_models_dir = 'emb_models'
     embs_dir = 'embs'
 
