@@ -129,13 +129,13 @@ class TweetData(Dataset):
         # flatten out samples and labels
         flatten_support_x = [ twt_emb
             for sublist in self.support_x_batch[idx] for twt_emb in sublist ]
-        support_y = [ lbl_idx
-            for sublist in self.support_y_batch[idx] for lbl_idx in sublist ].astype(np.int32)
+        support_y = np.array([ lbl_idx
+            for sublist in self.support_y_batch[idx] for lbl_idx in sublist ]).astype(np.int32)
 
         flatten_query_x = [ twt_emb
             for sublist in self.query_x_batch[idx] for twt_emb in sublist ]
-        query_y = [ lbl_idx
-            for sublist in self.query_y_batch[idx] for lbl_idx in sublist ].astype(np.int32)
+        query_y = np.array([ lbl_idx
+            for sublist in self.query_y_batch[idx] for lbl_idx in sublist ]).astype(np.int32)
 
         # put samples into tensors
         emb_size = len(flatten_support_x[0])
