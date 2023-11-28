@@ -3,6 +3,7 @@ import csv
 
 import fasttext
 import numpy as np
+import pandas as pd
 
 """
 Take the cleaned datasets
@@ -15,7 +16,7 @@ if __name__ == '__main__':
     # Otherwise retrain
     cache_models = True
 
-    data_dir = 'test_data'
+    data_dir = 'data'
     emb_models_dir = 'emb_models'
     embs_dir = 'embs'
 
@@ -64,7 +65,7 @@ if __name__ == '__main__':
                 tf.write('\n'.join(sentences))
                 train_fo.close()
 
-            print('Training FastText embedding model for', lang)
+            print('Training FastText embedding model for', lang, flush=True)
             model = fasttext.train_unsupervised(temp_fp, model='skipgram')
 
             # Delete temp file
@@ -78,7 +79,6 @@ if __name__ == '__main__':
         lang_dir = os.path.join(data_dir, ldir)
         for lang in lset:
             dsets = ['train', 'test', 'dev']
-            train_fp = os.path.join(lang_dir, 'clean_{l}_train.csv'.format(l=lang))
             
             # Get the language model
             print('Loaded', lang, 'FastText model')
@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
                     for row in dfo_reader:
                         sent_emb = ft_model.get_sentence_vector(row[0])
-                        emb_str = np.array2string(sent_emb)
+                        emb_str = np.array2string(sent_emb).replace('\n','')
                         emb_writer.writerow([ emb_str, row[1] ])
                 emb_fo.close()
                 print('Embeddings saved')
