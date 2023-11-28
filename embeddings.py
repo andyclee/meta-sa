@@ -3,7 +3,6 @@ import csv
 
 import fasttext
 import numpy as np
-import pandas as pd
 
 """
 Take the cleaned datasets
@@ -74,6 +73,10 @@ if __name__ == '__main__':
             print('Saving model')
             model.save_model(model_fp)
 
+    # Set writeout settings
+    np.set_printoptions(suppress=True,
+        formatter={'foat_kind':'{:.16f}'.format})
+
     # Get the csv embeddings
     for ldir, lset in languages.items():
         lang_dir = os.path.join(data_dir, ldir)
@@ -101,8 +104,8 @@ if __name__ == '__main__':
 
                     for row in dfo_reader:
                         sent_emb = ft_model.get_sentence_vector(row[0])
-                        emb_str = np.array2string(sent_emb).replace('\n','')
-                        emb_writer.writerow([ emb_str, row[1] ])
+                        emb_str = np.array2string(sent_emb).replace('\n', '')
+                        emb_writer.writerow([emb_str, row[1]])
                 emb_fo.close()
                 print('Embeddings saved')
 
