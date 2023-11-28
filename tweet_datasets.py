@@ -58,7 +58,9 @@ class TweetData(Dataset):
             with open(os.path.join(self.emb_dir, fn), 'r') as edfo:
                 csvreader = csv.reader(edfo, delimiter=',')
                 for row in csvreader:
-                    twt_emb = np.fromstring(row[0])
+                    twt_emb = [ float(v) for v in row[0][1:-1].split(' ') if len(v) > 0 ]
+                    twt_emb = np.array(twt_emb)
+                    assert len(twt_emb) == 100
                     sent_lbl = int(row[1])
                     class_lbl = None
                     if sent_lbl == -1:
@@ -76,7 +78,7 @@ class TweetData(Dataset):
                         dict_labels[class_lbl] = [ twt_emb ]
         return dict_labels
 
-    def create_batch(self)
+    def create_batch(self):
         self.support_x_batch = [] # support set batch
         self.support_y_batch = [] # the labels
         self.query_x_batch = [] # query set batch
@@ -103,7 +105,7 @@ class TweetData(Dataset):
                 query_x.append(
                     np.array(self.data[cls_idx])[index_test].tolist())
                 query_y.append(
-                    np.repeat(cls_idx, k_query).tolist())
+                    np.repeat(cls_idx, self.k_query).tolist())
 
             # shuffle support and query sets
             random.shuffle(support_x)
@@ -155,4 +157,18 @@ class TweetData(Dataset):
 
     def __len__(self):
         return self.batchsz
+
+if __name__ == '__main__':
+    tweets = TweetData('embs', n_way=5, k_shot=1, k_query=1, batchsz=1000)
+    for i, set_ in enumerate(tweets):
+        support_x, support_y, query_x, query_y = set_
+
+        print('batch', i)
+        print('support data', support_x[:5])
+        print('support labels', support_y[:5])
+        print('query data', query_x[:5])
+        print('query labels', query_y[:5])
+
+        if i == 10:
+            break
 
