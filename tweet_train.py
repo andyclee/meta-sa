@@ -52,11 +52,13 @@ def main(args):
     print(maml)
     print('Total trainable tensors:', num)
 
+    emb_dir = args.data_dir
+
     # batchsz is total episode number
-    tweets_train = TweetData('embs',
+    tweets_train = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
         batchsz=10000)
-    tweets_test = TweetData('embs',
+    tweets_test = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
         batchsz=100)
 
@@ -102,6 +104,7 @@ if __name__ == '__main__':
     argparser.add_argument('--update_lr', type=float, help='task-level inner update learning rate', default=0.01)
     argparser.add_argument('--update_step', type=int, help='task-level inner update steps', default=5)
     argparser.add_argument('--update_step_test', type=int, help='update steps for finetunning', default=10)
+    argparser.add_argument('--data_dir', type=str, help='directory with embeddings', default='embs')
 
     args = argparser.parse_args()
 
