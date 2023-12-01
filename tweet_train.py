@@ -41,8 +41,8 @@ def main(args):
 
     config = config_cnn
 
-    #device = torch.device('cuda')
-    device = torch.device('cpu')
+    device = torch.device('cuda')
+    #device = torch.device('cpu')
 
     # Get Meta learner from meta
     maml = Meta(args, config).to(device)
