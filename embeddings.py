@@ -91,6 +91,8 @@ if __name__ == '__main__':
             
             # Get the embeddings
             for dset in dsets:
+                if 'en' not in lang:
+                    continue
                 print('Getting embeddings for lang', lang, 'set', dset)
                 dset_fp = os.path.join(lang_dir,
                     'clean_{l}_{d}.csv'.format(l=lang,d=dset))

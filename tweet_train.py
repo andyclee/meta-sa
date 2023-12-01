@@ -5,7 +5,7 @@ import torch
 import numpy as np
 
 from torch.utils.data import DataLoader
-from torch.optim import lr_cheduler
+from torch.optim import lr_scheduler
 
 from tweet_datasets import TweetData
 from meta import Meta
@@ -18,7 +18,33 @@ def main(args):
 
     print(args)
 
-    device = torch.device('cuda')
+    # setup the layers here
+    config_cnn = [
+        # (layer_name, [params]),
+        ('conv1d', [1, 32, 3, 1, 'same']),
+        ('elu', [True]),
+        ('conv1d', [32, 32, 3, 1, 'same']),
+        ('elu', [True]),
+        ('conv1d', [32, 32, 3, 1, 'same']),
+        ('relu', [True]),
+        ('globalmax_pool1d', [True]),
+        ('dense', [32, 128]),
+        ('relu', [True]),
+        ('dropout', [0.3, True]),
+        ('dense', [128, 3]),
+        ('softmax', [])
+    ]
+
+    config_lstm = [
+
+    ]
+
+    config = config_cnn
+
+    #device = torch.device('cuda')
+    device = torch.device('cpu')
+
+    # Get Meta learner from meta
     maml = Meta(args, config).to(device)
 
     tmp = filter(lambda x : x.requires_grad, maml.parameters())
@@ -70,8 +96,7 @@ if __name__ == '__main__':
     argparser.add_argument('--n_way', type=int, help='n way', default=5)
     argparser.add_argument('--k_spt', type=int, help='k shot for support set', default=1)
     argparser.add_argument('--k_qry', type=int, help='k shot for query set', default=15)
-    argparser.add_argument('--imgsz', type=int, help='imgsz', default=84)
-    argparser.add_argument('--imgc', type=int, help='imgc', default=3)
+    argparser.add_argument('--embdim', type=int, help='size of embedding vectors', default=100)
     argparser.add_argument('--task_num', type=int, help='meta batch size, namely task num', default=4)
     argparser.add_argument('--meta_lr', type=float, help='meta-level outer learning rate', default=1e-3)
     argparser.add_argument('--update_lr', type=float, help='task-level inner update learning rate', default=0.01)

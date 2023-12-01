@@ -1,6 +1,7 @@
 import os
 import csv
 from math import floor
+import random
 
 eng_file = 'Sentiment140/eng_tweets.csv'
 
@@ -15,6 +16,7 @@ with open(eng_file, 'r', encoding='ISO-8859-1') as ef:
     ef_reader = csv.reader(ef, delimiter=',')
     csv_data = list(ef_reader)
 
+random.shuffle(csv_data)
 data_size = len(csv_data)
 train_size = floor(data_size * train)
 dev_size = floor(data_size * dev)
