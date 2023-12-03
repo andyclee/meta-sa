@@ -21,17 +21,17 @@ def main(args):
     # setup the layers here
     config_cnn = [
         # (layer_name, [params]),
-        ('conv1d', [1, 32, 3, 1, 'same']),
+        ('conv1d', [32, 1, 3, 1, 'same']),
         ('elu', [True]),
         ('conv1d', [32, 32, 3, 1, 'same']),
         ('elu', [True]),
         ('conv1d', [32, 32, 3, 1, 'same']),
         ('relu', [True]),
         ('globalmax_pool1d', [True]),
-        ('dense', [32, 128]),
+        ('dense', [128, 32]),
         ('relu', [True]),
         ('dropout', [0.3, True]),
-        ('dense', [128, 3]),
+        ('dense', [3, 128]),
         ('softmax', [])
     ]
 

@@ -28,19 +28,19 @@ class Learner(nn.Module):
 
             # CNN layers first
             if name == 'conv1d':
-                # param = [ ch_in, ch_out, kernelsz ]
+                # param = [ ch_out, ch_in, kernelsz ]
                 w = nn.Parameter(torch.ones(*param[:3]))
                 torch.nn.init.kaiming_normal_(w)
                 self.vars.append(w)
                 # param = [ ch_out ]
-                self.vars.append(nn.Parameter(torch.zeros(param[1])))
+                self.vars.append(nn.Parameter(torch.zeros(param[0])))
             elif name == 'dense':
-                # param = [ch_in, ch_out]
+                # param = [ch_out, ch_in]
                 w = nn.Parameter(torch.ones(*param))
                 torch.nn.init.kaiming_normal_(w)
                 self.vars.append(w)
                 # param = [ ch_out ]
-                self.vars.append(nn.Parameter(torch.zeros(param[1])))
+                self.vars.append(nn.Parameter(torch.zeros(param[0])))
             elif name in ['elu', 'relu', 'globalmax_pool1d', 'softmax', 'dropout']:
                 continue
             else:
@@ -90,7 +90,7 @@ class Learner(nn.Module):
         for name, param in self.config:
             if name == 'conv1d':
                 w, b = vars[idx], vars[idx + 1]
-                x = F.conv2d(x, w, b, stride=param[4], padding=param[5])
+                x = F.conv1d(x, w, b, stride=param[3], padding=param[4])
                 idx += 2
             elif name == 'dense':
                 w, b = vars[idx], vars[idx + 1]
