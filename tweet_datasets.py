@@ -79,8 +79,11 @@ class TweetData(Dataset):
         return dict_labels
 
     def create_batch(self):
+
+        # dim: [ self.batchsz, self.n_way, self.k_shot ]
         self.support_x_batch = [] # support set batch
         self.support_y_batch = [] # the labels
+        # dim: [ self.batchsz, self.n_way, self.k_query ]
         self.query_x_batch = [] # query set batch
         self.query_y_batch = []
         for b in range(self.batchsz):
@@ -127,11 +130,15 @@ class TweetData(Dataset):
         """
 
         # flatten out samples and labels
+
+        # self.support_x_batch[idx] has dim [ self.n_way, self.k_shot ]
+        # flattened to be [ self.n_way * self.k_shot ]
         flatten_support_x = [ twt_emb
             for sublist in self.support_x_batch[idx] for twt_emb in sublist ]
         support_y = np.array([ lbl_idx
             for sublist in self.support_y_batch[idx] for lbl_idx in sublist ]).astype(np.int32)
 
+        # flattened to be [ self.n_way * self.k_query ]
         flatten_query_x = [ twt_emb
             for sublist in self.query_x_batch[idx] for twt_emb in sublist ]
         query_y = np.array([ lbl_idx
@@ -140,7 +147,7 @@ class TweetData(Dataset):
         # put samples into tensors
         emb_size = len(flatten_support_x[0])
         support_x = torch.FloatTensor(self.setsz, emb_size)
-        query_x = torch.FloatTensor(self.setsz, emb_size)
+        query_x = torch.FloatTensor(self.querysz, emb_size)
 
         # get relative labels for the batch
         # label ranges from 0 to n-way
