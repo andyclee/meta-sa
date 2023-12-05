@@ -1,6 +1,8 @@
 import  torch
 from    torch import nn
 from    torch.nn import functional as F
+from torch._VF import lstm as f_lstm
+from torch.func import functional_call
 import  numpy as np
 
 class Learner(nn.Module):
@@ -41,6 +43,17 @@ class Learner(nn.Module):
                 self.vars.append(w)
                 # param = [ ch_out ]
                 self.vars.append(nn.Parameter(torch.zeros(param[0])))
+            elif name == 'bn':
+                # [ ch_out ]
+                w = nn.Parameter(torch.ones(param[0]))
+                self.vars.append(w)
+                # [ch_out]
+                self.vars.append(nn.Parameter(torch.zeros(param[0])))
+
+                # must set requires_grad=False
+                running_mean = nn.Parameter(torch.zeros(param[0]), requires_grad=False)
+                running_var = nn.Parameter(torch.ones(param[0]), requires_grad=False)
+                self.vars_bn.extend([running_mean, running_var])
             elif name in ['elu', 'relu', 'globalmax_pool1d', 'softmax', 'dropout']:
                 continue
             else:
@@ -58,7 +71,7 @@ class Learner(nn.Module):
                 tmp = 'dense:(ch_in%d, ch_out%d)'\
                         %(param[0], param[1])
                 info += tmp + '\n'
-            elif name in ['relu', 'elu', 'globalmax_pool1d', 'softmax', 'dropout']:
+            elif name in ['relu', 'elu', 'globalmax_pool1d', 'softmax', 'dropout', 'bn']:
                 tmp = name + ':' + str(tuple(param))
                 info += tmp + '\n'
             else:
@@ -97,6 +110,18 @@ class Learner(nn.Module):
                 x = F.linear(x, w, b)
                 idx += 2
                 # print('forward:', idx, x.norm().item())
+            elif name == 'bi-lstm':
+                w, b = vars[idx], vars[idx + 1]
+                # initial hidden states
+                hx = 
+                x = f_lstm(x, hx, w, b, 1, #dropout, self.training, True, batchfirst)
+                idx += 2
+            elif name == 'bn':
+                w, b = vars[idx], vars[idx + 1]
+                running_mean, running_var = self.vars_bn[bn_idx], self.vars_bn[bn_idx+1]
+                x = F.batch_norm(x, running_mean, running_var, weight=w, bias=b, training=bn_training)
+                idx += 2
+                bn_idx += 2
             elif name == 'elu':
                 x = F.elu(inplace=param[0])
             elif name == 'relu':

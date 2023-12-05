@@ -19,6 +19,8 @@ def main(args):
     print(args)
 
     # setup the layers here
+    config = None
+
     config_cnn = [
         # (layer_name, [params]),
         ('conv1d', [32, 1, 3, 1, 'same']),
@@ -35,8 +37,11 @@ def main(args):
         ('softmax', [])
     ]
 
+    # LSTMS all have dropout probability of 0.05
     config_lstm = [
-
+                    # [ 
+        ('bi-lstm', []), 
+        ('bi-lstm', [])
     ]
 
     config = config_cnn
