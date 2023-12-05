@@ -24,17 +24,17 @@ def main(args):
     config_cnn = [
         # (layer_name, [params]),
         ('conv1d', [32, 1, 3, 1, 'same']),
-        ('elu', [True]),
+        ('elu', [False]),
         ('conv1d', [32, 32, 3, 1, 'same']),
-        ('elu', [True]),
+        ('elu', [False]),
         ('conv1d', [32, 32, 3, 1, 'same']),
-        ('relu', [True]),
-        ('globalmax_pool1d', [True]),
+        ('relu', [False]),
+        ('globalmax_pool1d', []),
         ('dense', [128, 32]),
-        ('relu', [True]),
-        ('dropout', [0.3, True]),
-        ('dense', [3, 128]),
-        ('softmax', [])
+        ('relu', [False]),
+        ('dropout', [0.5, False]),
+        ('dense', [args.n_way, 128])
+#        ('softmax', []) # softmax applied in forward/finetunning
     ]
 
     # LSTMS all have dropout probability of 0.05
@@ -62,19 +62,30 @@ def main(args):
     # batchsz is total episode number
     tweets_train = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
-        batchsz=10000)
+        batchsz=args.train_batchsz)
     tweets_test = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
-        batchsz=100)
+        batchsz=args.test_batchsz)
 
     for epoch in range(args.epoch // 10000):
-        db = DataLoader(tweets_train, args.task_num, shuffle=True, num_workers=1, pin_memory=True)
+        db = DataLoader(tweets_train, batch_size=args.task_num,
+                shuffle=True, num_workers=1, pin_memory=True)
 
         for step, (x_spt, y_spt, x_qry, y_qry) in enumerate(db):
+            #print('pre to device has nan', torch.isnan(x_spt).any())
             x_spt = x_spt.to(device)
             y_spt = y_spt.to(device)
             x_qry = x_qry.to(device)
             y_qry = y_qry.to(device)
+
+            #print('x spt size', x_spt.size(), flush=True)
+            #print('y spt size', y_spt.size(), flush=True)
+            #print('spt labels', y_spt, flush=True)
+            #print('x qry size', x_qry.size(), flush=True)
+            #print('y qry size', y_qry.size(), flush=True)
+            #print('qry labels', y_qry, flush=True)
+            if torch.isnan(x_spt).any():
+                print(x_spt)
 
             accs = maml(x_spt, y_spt, x_qry, y_qry)
 
@@ -82,7 +93,8 @@ def main(args):
                 print('step:', step, '\ttraining acc:', accs)
 
             if step % 500 == 0:
-                db_test = DataLoader(tweets_test, 1, shuffle=True, num_workers=1, pin_memory=True)
+                db_test = DataLoader(tweets_test, batch_size=1,
+                    shuffle=True, num_workers=1, pin_memory=True)
                 accs_all_test = []
                 for t_x_spt, t_y_spt, t_x_qry, t_y_qry in db_test:
                     t_x_spt = t_x_spt.squeeze(0).to(device)
@@ -110,6 +122,8 @@ if __name__ == '__main__':
     argparser.add_argument('--update_step', type=int, help='task-level inner update steps', default=5)
     argparser.add_argument('--update_step_test', type=int, help='update steps for finetunning', default=10)
     argparser.add_argument('--data_dir', type=str, help='directory with embeddings', default='embs')
+    argparser.add_argument('--train_batchsz', type=int, help='number of train batches', default=10000)
+    argparser.add_argument('--test_batchsz', type=int, help='number of test batches', default=100)
 
     args = argparser.parse_args()
 

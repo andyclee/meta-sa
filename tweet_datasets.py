@@ -60,7 +60,8 @@ class TweetData(Dataset):
                 for row in csvreader:
                     twt_emb = [ float(v) for v in row[0][1:-1].split(' ') if len(v) > 0 ]
                     twt_emb = np.array(twt_emb)
-                    assert len(twt_emb) == 100
+                    #assert len(twt_emb) == 100
+                    assert not np.isnan(twt_emb).any(), 'loaded embedding in {fn} has nan'.format(fn=fn)
                     sent_lbl = int(row[1])
                     class_lbl = None
                     if sent_lbl == -1:
@@ -99,14 +100,22 @@ class TweetData(Dataset):
                 selected_twts_idx = np.random.choice(
                     len(self.data[cls_idx]), self.k_shot + self.k_query, False)
                 np.random.shuffle(selected_twts_idx)
-                index_train = np.array(selected_twts_idx[:self.k_shot]) # data indices for test
-                index_test = np.array(selected_cls_idx[self.k_shot:]) # for train
+                index_train = np.array(selected_twts_idx[:self.k_shot]) # data indices for train
+                index_test = np.array(selected_twts_idx[self.k_shot:]) # for test
                 support_x.append(
                     np.array(self.data[cls_idx])[index_train].tolist())
                 support_y.append(
                     np.repeat(cls_idx, self.k_shot).tolist())
                 query_x.append(
                     np.array(self.data[cls_idx])[index_test].tolist())
+                #if len(query_x[-1]) != self.k_query:
+                #    print('query', self.k_query, 'shot', self.k_shot, flush=True)
+                #    print('selected len', len(selected_twts_idx), flush=True)
+                #    print('index train len', len(index_train), flush=True)
+                #    print('index test len', len(index_test), flush=True)
+                #    print('query len', len(query_x[-1]), flush=True)
+                #    print('total data len', len(self.data[cls_idx]), flush=True)
+                assert len(query_x[-1]) == self.k_query
                 query_y.append(
                     np.repeat(cls_idx, self.k_query).tolist())
 
@@ -130,7 +139,6 @@ class TweetData(Dataset):
         """
 
         # flatten out samples and labels
-
         # self.support_x_batch[idx] has dim [ self.n_way, self.k_shot ]
         # flattened to be [ self.n_way * self.k_shot ]
         flatten_support_x = [ twt_emb
@@ -139,17 +147,28 @@ class TweetData(Dataset):
             for sublist in self.support_y_batch[idx] for lbl_idx in sublist ]).astype(np.int32)
 
         # flattened to be [ self.n_way * self.k_query ]
+        #print('query total shape', np.array(self.query_x_batch[idx]).shape, flush=True)
         flatten_query_x = [ twt_emb
             for sublist in self.query_x_batch[idx] for twt_emb in sublist ]
         query_y = np.array([ lbl_idx
             for sublist in self.query_y_batch[idx] for lbl_idx in sublist ]).astype(np.int32)
 
+        #print('flatten query x shape', np.array(flatten_query_x).shape, flush=True)
+        #print('query y shape', np.array(query_y).shape, flush=True)
+
         # put samples into tensors
         emb_size = len(flatten_support_x[0])
-        support_x = torch.FloatTensor(self.setsz, emb_size)
-        query_x = torch.FloatTensor(self.querysz, emb_size)
+        # [ n_way * k_shot (setsz) , 1, emb_size ]
+        support_x = torch.FloatTensor(
+            np.array(flatten_support_x).reshape((self.setsz, 1, emb_size))
+        )
+        # [ n_way * k_query (querysz) , 1, emb_size ]
+        query_x = torch.FloatTensor(
+            np.array(flatten_query_x).reshape((self.querysz, 1, emb_size))
+        )
 
         # get relative labels for the batch
+        # sampled classes same in support and query
         # label ranges from 0 to n-way
         unique_lbls = np.unique(support_y)
         random.shuffle(unique_lbls)
