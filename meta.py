@@ -62,13 +62,13 @@ class Meta(nn.Module):
     def forward(self, x_spt, y_spt, x_qry, y_qry):
         """
 
-        :param x_spt:   [b, setsz, c_, h, w]
+        :param x_spt:   [b, setsz, c, d]
         :param y_spt:   [b, setsz]
-        :param x_qry:   [b, querysz, c_, h, w]
+        :param x_qry:   [b, querysz, c, d]
         :param y_qry:   [b, querysz]
         :return:
         """
-        task_num, setsz, c_, h, w = x_spt.size()
+        task_num, setsz, c, d = x_spt.size()
         querysz = x_qry.size(1)
 
         losses_q = [0 for _ in range(self.update_step + 1)]  # losses_q[i] is the loss on step i
@@ -147,13 +147,13 @@ class Meta(nn.Module):
     def finetunning(self, x_spt, y_spt, x_qry, y_qry):
         """
 
-        :param x_spt:   [setsz, c_, h, w]
+        :param x_spt:   [setsz, c, d]
         :param y_spt:   [setsz]
-        :param x_qry:   [querysz, c_, h, w]
+        :param x_qry:   [querysz, c, d]
         :param y_qry:   [querysz]
         :return:
         """
-        assert len(x_spt.shape) == 4
+        assert len(x_spt.shape) == 3
 
         querysz = x_qry.size(0)
 
@@ -165,6 +165,9 @@ class Meta(nn.Module):
 
         # 1. run the i-th task and compute loss for k=0
         logits = net(x_spt)
+#        print('input size', x_spt.size())
+#        print('logits size', logits.size())
+#        print('logits', logits)
         loss = F.cross_entropy(logits, y_spt)
         grad = torch.autograd.grad(loss, net.parameters())
         fast_weights = list(map(lambda p: p[1] - self.update_lr * p[0], zip(grad, net.parameters())))
