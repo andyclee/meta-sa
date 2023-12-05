@@ -30,7 +30,7 @@ def main(args):
         ('globalmax_pool1d', []),
         ('dense', [128, 32]),
         ('relu', [False]),
-        ('dropout', [0.3, False]),
+        ('dropout', [0.5, False]),
         ('dense', [args.n_way, 128])
 #        ('softmax', []) # softmax applied in forward/finetunning
     ]
