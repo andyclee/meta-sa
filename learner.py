@@ -43,6 +43,32 @@ class Learner(nn.Module):
                 self.vars.append(w)
                 # param = [ ch_out ]
                 self.vars.append(nn.Parameter(torch.zeros(param[0])))
+            elif name == 'bi-lstm':
+                # forward weights inputs
+                # [ 4 x hidden, in size ]
+                w_ih = nn.Parameter(torch.ones(4 * param[1], param[0]))
+                torch.nn.init.kaiming_normal_(w_ih)
+                # [ 4 x hidden, hidden size ]
+                w_hh = nn.Parameter(torch.ones(4 * param[1], param[1]))
+                torch.nn.init.kaiming_normal_(w_hh)
+                # backwards inputs, flip dims of forwards direction
+                r_w_ih = nn.Parameter(torch.ones(param[0], 4 * param[1]))
+                torch.nn.init.kaiming_normal_(r_w_ih)
+                r_w_hh = nn.Parameter(torch.ones(param[1], 4 * param[1]])
+                torch.nn.init.kaiming_normal_(r_w_hh)
+
+                self.vars.extend([w_ih, w_hh, r_w_ih, r_w_hh])
+
+                # forward biases
+                # [ 4 x hidden size ]
+                b_ih = nn.Parameter(torch.zeros(4 * param[1]))
+                # [ 4 x hidden size ]
+                b_hh = nn.Parameter(torch.zeros(4 * param[1]))
+                # backwards biases
+                r_b_ih = nn.Parameter(torch.zeros(4 * param[1]))
+                r_b_hh = nn.Parameter(torch.zeros(4 * param[1]))
+
+                self.vars.extend([b_ih, b_hh, r_b_ih, r_b_hh])
             elif name == 'bn':
                 # [ ch_out ]
                 w = nn.Parameter(torch.ones(param[0]))
@@ -119,11 +145,23 @@ class Learner(nn.Module):
                 idx += 2
                 # print('forward:', idx, x.norm().item())
             elif name == 'bi-lstm':
-                w, b = vars[idx], vars[idx + 1]
+                w_ih, w_hh, r_w_ih, r_w_hh = vars[idx], vars[idx + 1], vars[idx + 2], vars[idx + 3]
+                weights = [w_ih, w_hh, r_w_ih, r_w_hh]
+                b_ih, b_hh, r_b_ih, r_b_hh = vars[idx + 4], vars[idx + 5], vars[idx + 6], vars[idx + 7]
+                biases = [b_ih, b_hh, r_b_ih, r_b_hh]
                 # initial hidden states
-                hx = 
-                x = f_lstm(x, hx, w, b, 1, #dropout, self.training, True, batchfirst)
-                idx += 2
+
+                # hidden layers
+                batch_size = x.size(0)
+                h_zeros = nn.Parameter(torch.zeros(1 * 2, batch_size, param[1]))
+                c_zeros = nn.Parameter(torch.zeros(1 * 2, batch_size, param[1]))
+                hx = (h_zeros, c_zeros)
+               
+                flat_w = torch.cat([ torch.flatten(w) for w in weights]
+                flat_b = torch.cat(biases)
+                # input, hx, flat weights, bias, num layers, deropout, training, bidirectional, batch first
+                x, (h_n, c_n) = f_lstm(x, hx, flat_w, flat_b, 1, param[2], self.training, True, False)
+                idx += 8
             elif name == 'bn':
                 w, b = vars[idx], vars[idx + 1]
                 running_mean, running_var = self.vars_bn[bn_idx], self.vars_bn[bn_idx+1]

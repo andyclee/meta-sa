@@ -39,12 +39,22 @@ def main(args):
 
     # LSTMS all have dropout probability of 0.05
     config_lstm = [
-                    # [ 
-        ('bi-lstm', []), 
-        ('bi-lstm', [])
+                    # [ in_size, hidden_size, dropout ] 
+        ('bi-lstm', [args.embdim, 50, 0.05]), 
+        ('bi-lstm', [50 * 2, 20, 0.05]),
+                    # [ out_size, in_size ]
+        ('dense', [20, 20 * 2]),
+        ('elu', [False]),
+        ('dropout', [0.5, False]),
+        ('dense', [args.n_way, 20])
     ]
 
-    config = config_cnn
+    if args.arch == 'cnn':
+        config = config_cnn
+    elif args.arch == 'lstm':
+        config = config_lstm
+    else:
+        raise NotImplementedError
 
     device = torch.device('cuda')
     #device = torch.device('cpu')
@@ -124,6 +134,7 @@ if __name__ == '__main__':
     argparser.add_argument('--data_dir', type=str, help='directory with embeddings', default='embs')
     argparser.add_argument('--train_batchsz', type=int, help='number of train batches', default=10000)
     argparser.add_argument('--test_batchsz', type=int, help='number of test batches', default=100)
+    argparser.add_argument('--arch', type=str, help='cnn or lstm', default='cnn')
 
     args = argparser.parse_args()
 
