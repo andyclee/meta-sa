@@ -11,7 +11,7 @@ class TweetData(Dataset):
     Put language datasets into PyTorch format
     """
 
-    def __init__(self, emb_dir, batchsz, n_way, k_shot, k_query):
+    def __init__(self, emb_dir, batchsz, n_way, k_shot, k_query, lang_only=False):
         """
         emb_dir: Directory with the embeddings
         mode: train, dev, or test
@@ -19,10 +19,13 @@ class TweetData(Dataset):
         n_way
         k_shot
         k_query
+
+        if lang_only then only use language as label, not sentiment
         """
 
         # Data location
         self.emb_dir = emb_dir
+        self.lang_only = lang_only
 
         # User provided params
         self.batchsz = batchsz
@@ -58,13 +61,23 @@ class TweetData(Dataset):
             with open(os.path.join(self.emb_dir, fn), 'r') as edfo:
                 csvreader = csv.reader(edfo, delimiter=',')
                 for row in csvreader:
-                    twt_emb = [ float(v) for v in row[0][1:-1].split(' ') if len(v) > 0 ]
-                    twt_emb = np.array(twt_emb)
-                    #assert len(twt_emb) == 100
-                    assert not np.isnan(twt_emb).any(), 'loaded embedding in {fn} has nan'.format(fn=fn)
-                    sent_lbl = int(row[1])
+                    twt_emb = []
                     class_lbl = None
-                    if sent_lbl == -1:
+
+                    if len(row) == 2:
+
+                        # non-laser embs
+                        twt_emb = [ float(v) for v in row[0][1:-1].split(' ') if len(v) > 0 ]
+                        twt_emb = np.array(twt_emb)
+                        sent_lbl = int(row[1])
+                    else:
+
+                        # laser embs
+                        twt_emb = [ float(v) for v in row[:-1] ]
+                        sent_lbl = int(row[-1])
+                    if self.lang_only:
+                        class_lbl = lang
+                    elif sent_lbl == -1:
                         class_lbl = lang + '_neg'
                     elif sent_lbl == 0:
                         class_lbl = lang + '_neu'

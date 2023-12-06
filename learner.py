@@ -2,7 +2,6 @@ import  torch
 from    torch import nn
 from    torch.nn import functional as F
 from torch._VF import lstm as f_lstm
-from torch.func import functional_call
 import  numpy as np
 
 class Learner(nn.Module):
@@ -19,6 +18,8 @@ class Learner(nn.Module):
 
 
         self.config = config
+
+        self.device = torch.device('cuda')
 
         # this dict contains all tensors needed to be optimized
         self.vars = nn.ParameterList()
@@ -46,29 +47,32 @@ class Learner(nn.Module):
             elif name == 'bi-lstm':
                 # forward weights inputs
                 # [ 4 x hidden, in size ]
-                w_ih = nn.Parameter(torch.ones(4 * param[1], param[0]))
-                torch.nn.init.kaiming_normal_(w_ih)
+                w_ih = torch.ones(4 * param[1], param[0])
+                torch.nn.init.xavier_normal_(w_ih)
                 # [ 4 x hidden, hidden size ]
-                w_hh = nn.Parameter(torch.ones(4 * param[1], param[1]))
-                torch.nn.init.kaiming_normal_(w_hh)
+                w_hh = torch.ones(4 * param[1], param[1])
+                torch.nn.init.xavier_normal_(w_hh)
                 # backwards inputs, flip dims of forwards direction
-                r_w_ih = nn.Parameter(torch.ones(param[0], 4 * param[1]))
-                torch.nn.init.kaiming_normal_(r_w_ih)
-                r_w_hh = nn.Parameter(torch.ones(param[1], 4 * param[1]])
-                torch.nn.init.kaiming_normal_(r_w_hh)
-
-                self.vars.extend([w_ih, w_hh, r_w_ih, r_w_hh])
+                r_w_ih = torch.ones(param[0], 4 * param[1])
+                torch.nn.init.xavier_normal_(r_w_ih)
+                r_w_hh = torch.ones(param[1], 4 * param[1])
+                torch.nn.init.xavier_normal_(r_w_hh)
 
                 # forward biases
                 # [ 4 x hidden size ]
-                b_ih = nn.Parameter(torch.zeros(4 * param[1]))
+                b_ih = torch.zeros(4 * param[1])
                 # [ 4 x hidden size ]
-                b_hh = nn.Parameter(torch.zeros(4 * param[1]))
+                b_hh = torch.zeros(4 * param[1])
                 # backwards biases
-                r_b_ih = nn.Parameter(torch.zeros(4 * param[1]))
-                r_b_hh = nn.Parameter(torch.zeros(4 * param[1]))
+                r_b_ih = torch.zeros(4 * param[1])
+                r_b_hh = torch.zeros(4 * param[1])
 
-                self.vars.extend([b_ih, b_hh, r_b_ih, r_b_hh])
+                # flatten weights and biases so they can be put into one piece of memory
+                lstm_wvecs = [w_ih, w_hh, r_w_ih, r_w_hh, b_ih, b_hh, r_b_ih, r_b_hh]
+                w = nn.Parameter(torch.cat([
+                    torch.flatten(wvec) for wvec in lstm_wvecs
+                ]))
+                self.vars.append(w)
             elif name == 'bn':
                 # [ ch_out ]
                 w = nn.Parameter(torch.ones(param[0]))
@@ -80,7 +84,7 @@ class Learner(nn.Module):
                 running_mean = nn.Parameter(torch.zeros(param[0]), requires_grad=False)
                 running_var = nn.Parameter(torch.ones(param[0]), requires_grad=False)
                 self.vars_bn.extend([running_mean, running_var])
-            elif name in ['elu', 'relu', 'globalmax_pool1d', 'softmax', 'dropout']:
+            elif name in ['elu', 'relu', 'tanh', 'globalmax_pool1d', 'max_pool1d', 'softmax', 'dropout']:
                 continue
             else:
                 raise NotImplementedError
@@ -97,7 +101,14 @@ class Learner(nn.Module):
                 tmp = 'dense:(ch_out:%d, ch_in:%d)'\
                         %(param[0], param[1])
                 info += tmp + '\n'
-            elif name in ['relu', 'elu', 'globalmax_pool1d', 'softmax', 'dropout', 'bn']:
+            elif name == 'bi-lstm':
+                tmp = 'bi-lstm:(in_size:%d, hidden:%d, dropout:%f)'\
+                        %(param[0], param[1], param[2])
+                info += tmp + '\n'
+            elif name == 'max_pool1d':
+                tmp = 'max_pool1d:(pool_size:%d)'%(param[0])
+                info += tmp + '\n'
+            elif name in ['relu', 'elu', 'tanh', 'globalmax_pool1d', 'softmax', 'dropout', 'bn']:
                 tmp = name + ':' + str(tuple(param))
                 info += tmp + '\n'
             else:
@@ -140,28 +151,69 @@ class Learner(nn.Module):
                 #print('linear b tensor', b.size(), flush=True)
                 #print('input into linear', x.size(), flush=True)
                 x = F.linear(x, w, b)
+                x = torch.squeeze(x)
                 #print('output from linear', x.size(), flush=True)
                 assert not torch.isnan(x).any(), 'nan in layer'
+                #print('dense output size', x.size(), flush=True)
                 idx += 2
                 # print('forward:', idx, x.norm().item())
             elif name == 'bi-lstm':
-                w_ih, w_hh, r_w_ih, r_w_hh = vars[idx], vars[idx + 1], vars[idx + 2], vars[idx + 3]
-                weights = [w_ih, w_hh, r_w_ih, r_w_hh]
-                b_ih, b_hh, r_b_ih, r_b_hh = vars[idx + 4], vars[idx + 5], vars[idx + 6], vars[idx + 7]
-                biases = [b_ih, b_hh, r_b_ih, r_b_hh]
-                # initial hidden states
+                flattened = vars[idx]
+                cur_pos = 0
+                w_ih = torch.reshape(
+                    flattened[cur_pos:cur_pos + 4 * param[1] * param[0]],
+                    (4 * param[1], param[0])
+                )
+                cur_pos += 4 * param[1] * param[0]
+                w_hh = torch.reshape(
+                    flattened[cur_pos:cur_pos + 4 * param[1] * param[1]],
+                    (4 * param[1], param[1])
+                )
+                cur_pos += 4 * param[1] * param[1]
+                r_w_ih = torch.reshape(
+                    flattened[cur_pos:cur_pos + param[0] * 4 * param[1]],
+                    (param[0], 4 * param[1])
+                )
+                cur_pos += param[0] * 4 * param[1]
+                r_w_hh = torch.reshape(
+                    flattened[cur_pos:cur_pos + param[1] * 4 * param[1]],
+                    (param[1], 4 * param[1])
+                )
+
+                b_ih = torch.reshape(
+                    flattened[cur_pos:cur_pos + 4 * param[1]],
+                    (4 * param[1],)
+                )
+                cur_pos += 4 * param[1]
+                b_hh = torch.reshape(
+                    flattened[cur_pos:cur_pos + 4 * param[1]],
+                    (4 * param[1],)
+                )
+                cur_pos += 4 * param[1]
+                r_b_ih = torch.reshape(
+                    flattened[cur_pos:cur_pos + 4 * param[1]],
+                    (4 * param[1],)
+                )
+                cur_pos += 4 * param[1]
+                r_b_hh = torch.reshape(
+                    flattened[cur_pos:cur_pos + 4 * param[1]],
+                    (4 * param[1],)
+                )
+                cur_pos += 4 * param[1]
 
                 # hidden layers
-                batch_size = x.size(0)
-                h_zeros = nn.Parameter(torch.zeros(1 * 2, batch_size, param[1]))
-                c_zeros = nn.Parameter(torch.zeros(1 * 2, batch_size, param[1]))
+                batch_size = x.size(1)
+                h_zeros = torch.zeros(1 * 2, batch_size, param[1]).to(self.device)
+                c_zeros = torch.zeros(1 * 2, batch_size, param[1]).to(self.device)
                 hx = (h_zeros, c_zeros)
                
-                flat_w = torch.cat([ torch.flatten(w) for w in weights]
-                flat_b = torch.cat(biases)
+                flat_weights = [ w_ih, w_hh, b_ih, b_hh, r_w_ih, r_w_hh, r_b_ih, r_b_hh ]
+                #flat_w = torch.cat([ torch.flatten(w) for w in weights])
+                #flat_b = torch.cat(biases)
                 # input, hx, flat weights, bias, num layers, deropout, training, bidirectional, batch first
-                x, (h_n, c_n) = f_lstm(x, hx, flat_w, flat_b, 1, param[2], self.training, True, False)
-                idx += 8
+                result = f_lstm(x, hx, flat_weights, True, 1, param[2], self.training, True, False)
+                x = result[0]
+                idx += 1
             elif name == 'bn':
                 w, b = vars[idx], vars[idx + 1]
                 running_mean, running_var = self.vars_bn[bn_idx], self.vars_bn[bn_idx+1]
@@ -174,12 +226,19 @@ class Learner(nn.Module):
             elif name == 'relu':
                 x = F.relu(x, inplace=param[0])
                 assert not torch.isnan(x).any(), 'nan in layer'
+            elif name == 'tanh':
+                x = F.tanh(x)
             elif name == 'globalmax_pool1d':
                 #print('input into global max pool', x.size(), flush=True)
                 x = F.adaptive_max_pool1d(x, 1)
                 x = torch.flatten(x, start_dim=1)
                 assert not torch.isnan(x).any(), 'nan in layer'
                 #print('output from global max pool', x.size(), flush=True)
+            elif name == 'max_pool1d':
+                #print('x size before max pool', x.size(), flush=True)
+                x = F.max_pool1d(x, kernel_size=param[0])
+                x = x.view(x.size(0), -1)
+                #print('x size after max pool', x.size(), flush=True)
             elif name == 'dropout':
                 x = F.dropout(x, p=param[0], inplace=param[1])
                 assert not torch.isnan(x).any(), 'nan in layer'

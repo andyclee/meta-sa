@@ -74,10 +74,10 @@ def main(args):
     # batchsz is total episode number
     tweets_train = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
-        batchsz=args.train_batchsz)
+        batchsz=args.train_batchsz, lang_only=True)
     tweets_test = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
-        batchsz=args.test_batchsz)
+        batchsz=args.test_batchsz, lang_only=True)
 
     for epoch in range(args.epoch // 10000):
         db = DataLoader(tweets_train, batch_size=args.task_num,

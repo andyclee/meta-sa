@@ -21,13 +21,13 @@ UPDATE_LR=0.1
 UPDATE_STEP=5
 UPDATE_STEP_TEST=10
 
-EPOCH=100000
+EPOCH=60000
 TRAIN_BATCHSZ=10000
 TEST_BATCHSZ=100
 
 ARCH=lstm
 
-python3 tweet_train.py --epoch ${EPOCH} \
+python3 lang_tweet_train.py --epoch ${EPOCH} \
         --n_way ${N_WAY} \
         --k_spt ${K_SPT} \
         --k_qry ${K_QRY} \
