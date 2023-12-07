@@ -27,6 +27,7 @@ class TweetData(Dataset):
         # Data location
         self.emb_dir = emb_dir
         self.lang_only = lang_only
+        self.disk_load = disk_load
 
         # User provided params
         self.batchsz = batchsz
@@ -91,11 +92,11 @@ class TweetData(Dataset):
                     else:
                         raise ValueError
 
-                    if disk_load and class_lbl not in dict_labels:
+                    if self.disk_load and class_lbl not in dict_labels:
                         dict_labels[class_lbl] = [(fn, row_num)]
-                    elif disk_load and class_lbl in dict_labels:
+                    elif self.disk_load and class_lbl in dict_labels:
                         dict_labels[class_lbl].append[(fn, row_num)]
-                    elif not disk_load and class_lbl in dict_labels:
+                    elif not self.disk_load and class_lbl in dict_labels:
                         dict_labels[class_lbl].append(twt_emb)
                     else:
                         dict_labels[class_lbl] = [ twt_emb ]
@@ -177,7 +178,7 @@ class TweetData(Dataset):
             for sublist in self.query_x_batch[idx] for twt_emb in sublist ]
 
         # if disk load need to convert twt_data into actual embedding
-        if disk_load:
+        if self.disk_load:
             fn_fo_map = { } # { fn : fo }
             for i, (fn, row_num) in flatten_support_x:
                 if fn not in fn_fo_map:
