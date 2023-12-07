@@ -11,7 +11,7 @@ class TweetData(Dataset):
     Put language datasets into PyTorch format
     """
 
-    def __init__(self, emb_dir, batchsz, n_way, k_shot, k_query, lang_only=False):
+    def __init__(self, emb_dir, batchsz, n_way, k_shot, k_query, lang_only=False, disk_load=False):
         """
         emb_dir: Directory with the embeddings
         mode: train, dev, or test
@@ -21,6 +21,7 @@ class TweetData(Dataset):
         k_query
 
         if lang_only then only use language as label, not sentiment
+        if disk_load then load samples from disk (used for large dim embeddings)
         """
 
         # Data location
@@ -42,10 +43,13 @@ class TweetData(Dataset):
 
         # { lbl name : idx in self.data }
         self.class_idx = {}
+        # { idx : lbl name }
+        self.idx_to_lbl = {}
         csvdata = self.load_data()
         for i, (lbl, twts) in enumerate(csvdata.items()):
             self.data.append(twts)
             self.class_idx[lbl] = i
+            self.idx_to_lbl[i] = lbl
         self.cls_num = len(self.class_idx)
         
         self.create_batch()
@@ -60,6 +64,7 @@ class TweetData(Dataset):
             
             with open(os.path.join(self.emb_dir, fn), 'r') as edfo:
                 csvreader = csv.reader(edfo, delimiter=',')
+                row_num = 0
                 for row in csvreader:
                     twt_emb = []
                     class_lbl = None
@@ -86,10 +91,16 @@ class TweetData(Dataset):
                     else:
                         raise ValueError
 
-                    if class_lbl in dict_labels:
+                    if disk_load and class_lbl not in dict_labels:
+                        dict_labels[class_lbl] = [(fn, row_num)]
+                    elif disk_load and class_lbl in dict_labels:
+                        dict_labels[class_lbl].append[(fn, row_num)]
+                    elif not disk_load and class_lbl in dict_labels:
                         dict_labels[class_lbl].append(twt_emb)
                     else:
                         dict_labels[class_lbl] = [ twt_emb ]
+
+                    row_num += 1
         return dict_labels
 
     def create_batch(self):
@@ -110,17 +121,22 @@ class TweetData(Dataset):
             query_y = []
             for cls_idx in selected_cls_idx:
                 # Select k_shot + k_query samples from each class
+                cls_data_size = -1
+                cls_data_size = len(self.data[cls_idx])
+
                 selected_twts_idx = np.random.choice(
-                    len(self.data[cls_idx]), self.k_shot + self.k_query, False)
+                    cls_data_size, self.k_shot + self.k_query, False)
                 np.random.shuffle(selected_twts_idx)
                 index_train = np.array(selected_twts_idx[:self.k_shot]) # data indices for train
                 index_test = np.array(selected_twts_idx[self.k_shot:]) # for test
-                support_x.append(
-                    np.array(self.data[cls_idx])[index_train].tolist())
+
+                # if disk load then only save the indices
+                spt_x_data = np.array(self.data[cls_idx])[index_train].tolist()
+                qry_x_data = np.array(self.data[cls_idx])[index_test].tolist()
+                support_x.append(spt_x_data)
                 support_y.append(
                     np.repeat(cls_idx, self.k_shot).tolist())
-                query_x.append(
-                    np.array(self.data[cls_idx])[index_test].tolist())
+                query_x.append(qry_x_data)
                 #if len(query_x[-1]) != self.k_query:
                 #    print('query', self.k_query, 'shot', self.k_shot, flush=True)
                 #    print('selected len', len(selected_twts_idx), flush=True)
@@ -128,7 +144,6 @@ class TweetData(Dataset):
                 #    print('index test len', len(index_test), flush=True)
                 #    print('query len', len(query_x[-1]), flush=True)
                 #    print('total data len', len(self.data[cls_idx]), flush=True)
-                assert len(query_x[-1]) == self.k_query
                 query_y.append(
                     np.repeat(cls_idx, self.k_query).tolist())
 
@@ -151,18 +166,64 @@ class TweetData(Dataset):
         0 <= idx <= batchsz - 1
         """
 
-        # flatten out samples and labels
         # self.support_x_batch[idx] has dim [ self.n_way, self.k_shot ]
         # flattened to be [ self.n_way * self.k_shot ]
-        flatten_support_x = [ twt_emb
+        flatten_support_x = [ twt_data
             for sublist in self.support_x_batch[idx] for twt_emb in sublist ]
-        support_y = np.array([ lbl_idx
-            for sublist in self.support_y_batch[idx] for lbl_idx in sublist ]).astype(np.int32)
 
         # flattened to be [ self.n_way * self.k_query ]
         #print('query total shape', np.array(self.query_x_batch[idx]).shape, flush=True)
-        flatten_query_x = [ twt_emb
+        flatten_query_x = [ twt_data
             for sublist in self.query_x_batch[idx] for twt_emb in sublist ]
+
+        # if disk load need to convert twt_data into actual embedding
+        if disk_load:
+            fn_fo_map = { } # { fn : fo }
+            for i, (fn, row_num) in flatten_support_x:
+                if fn not in fn_fo_map:
+                    fo = open(os.path.join(self.emb_dir, fn), 'r')
+                    fn_fo_map[fn] = fo
+                fo = fn_fo_map[fn]
+                fo.seek(row_num)
+                row = csv.reader(fo.readline(), delimiter=',')
+                
+                if len(row) == 2:
+
+                    # non-laser embs
+                    twt_emb = [ float(v) for v in row[0][1:-1].split(' ') if len(v) > 0 ]
+                    twt_emb = np.array(twt_emb)
+                else:
+
+                    # laser embs
+                    twt_emb = [ float(v) for v in row[:-1] ]
+
+                flatten_support_x[i] = twt_emb
+
+            for i, (fn, row_num) in flatten_query_x:
+                if fn not in fn_fo_map:
+                    fo = open(os.path.join(self.emb_dir, fn), 'r')
+                    fn_fo_map[fn] = fo
+                fo = fn_fo_map[fn]
+                fo.seek(row_num)
+                row = csv.reader(fo.readline(), delimiter=',')
+                
+                if len(row) == 2:
+
+                    # non-laser embs
+                    twt_emb = [ float(v) for v in row[0][1:-1].split(' ') if len(v) > 0 ]
+                    twt_emb = np.array(twt_emb)
+                else:
+
+                    # laser embs
+                    twt_emb = [ float(v) for v in row[:-1] ]
+
+                flatten_query_x[i] = twt_emb
+
+            for fo in fn_fo_map.values():
+                fo.close()
+
+        support_y = np.array([ lbl_idx
+            for sublist in self.support_y_batch[idx] for lbl_idx in sublist ]).astype(np.int32)
         query_y = np.array([ lbl_idx
             for sublist in self.query_y_batch[idx] for lbl_idx in sublist ]).astype(np.int32)
 
