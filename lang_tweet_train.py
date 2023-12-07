@@ -74,10 +74,10 @@ def main(args):
     # batchsz is total episode number
     tweets_train = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
-        batchsz=args.train_batchsz, lang_only=True)
+        batchsz=args.train_batchsz, lang_only=True, disk_load=args.disk_load)
     tweets_test = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
-        batchsz=args.test_batchsz, lang_only=True)
+        batchsz=args.test_batchsz, lang_only=True, disk_load=args.disk_load)
 
     for epoch in range(args.epoch // 10000):
         db = DataLoader(tweets_train, batch_size=args.task_num,
@@ -137,6 +137,7 @@ if __name__ == '__main__':
     argparser.add_argument('--train_batchsz', type=int, help='number of train batches', default=10000)
     argparser.add_argument('--test_batchsz', type=int, help='number of test batches', default=100)
     argparser.add_argument('--arch', type=str, help='cnn or lstm', default='cnn')
+    argparser.add_argument('--disk_load', help='load embeddings from disk, saves memory', action='store_true')
 
     args = argparser.parse_args()
 

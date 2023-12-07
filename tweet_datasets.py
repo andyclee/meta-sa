@@ -93,9 +93,9 @@ class TweetData(Dataset):
                         raise ValueError
 
                     if self.disk_load and class_lbl not in dict_labels:
-                        dict_labels[class_lbl] = [(fn, row_num)]
+                        dict_labels[class_lbl] = [ (fn, row_num) ]
                     elif self.disk_load and class_lbl in dict_labels:
-                        dict_labels[class_lbl].append[(fn, row_num)]
+                        dict_labels[class_lbl].append( (fn, row_num) )
                     elif not self.disk_load and class_lbl in dict_labels:
                         dict_labels[class_lbl].append(twt_emb)
                     else:
@@ -170,12 +170,12 @@ class TweetData(Dataset):
         # self.support_x_batch[idx] has dim [ self.n_way, self.k_shot ]
         # flattened to be [ self.n_way * self.k_shot ]
         flatten_support_x = [ twt_data
-            for sublist in self.support_x_batch[idx] for twt_emb in sublist ]
+            for sublist in self.support_x_batch[idx] for twt_data in sublist ]
 
         # flattened to be [ self.n_way * self.k_query ]
         #print('query total shape', np.array(self.query_x_batch[idx]).shape, flush=True)
         flatten_query_x = [ twt_data
-            for sublist in self.query_x_batch[idx] for twt_emb in sublist ]
+            for sublist in self.query_x_batch[idx] for twt_data in sublist ]
 
         # if disk load need to convert twt_data into actual embedding
         if self.disk_load:
