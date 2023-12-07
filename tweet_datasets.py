@@ -180,7 +180,7 @@ class TweetData(Dataset):
         # if disk load need to convert twt_data into actual embedding
         if self.disk_load:
             fn_fo_map = { } # { fn : fo }
-            for i, (fn, row_num) in flatten_support_x:
+            for i, (fn, row_num) in enumerate(flatten_support_x):
                 if fn not in fn_fo_map:
                     fo = open(os.path.join(self.emb_dir, fn), 'r')
                     fn_fo_map[fn] = fo
@@ -200,7 +200,7 @@ class TweetData(Dataset):
 
                 flatten_support_x[i] = twt_emb
 
-            for i, (fn, row_num) in flatten_query_x:
+            for i, (fn, row_num) in enumerate(flatten_query_x):
                 if fn not in fn_fo_map:
                     fo = open(os.path.join(self.emb_dir, fn), 'r')
                     fn_fo_map[fn] = fo

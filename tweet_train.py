@@ -34,7 +34,7 @@ def main(args):
         ('dense', [128, int(32 * args.embdim / 2)]),
         ('tanh', []),
         #('relu', [False]),
-        ('dropout', [0.3, False]),
+        ('dropout', [0.5, False]),
         ('dense', [args.n_way, 128])
 #        ('softmax', []) # softmax applied in forward/finetunning
     ]
