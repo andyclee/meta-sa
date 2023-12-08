@@ -190,7 +190,7 @@ class TweetData(Dataset):
                     fn_reader_map[fn] = csv.reader(fo, delimiter=',')
                     fo_list.append(fo)
                 fn_reader = fn_reader_map[fn]
-                row = next(islice(fn_reader, row_num))
+                row = next(islice(fn_reader, row_num, row_num + 1))
                
                 twt_emb = None
                 if len(row) == 2:
@@ -211,7 +211,7 @@ class TweetData(Dataset):
                     fn_reader_map[fn] = csv.reader(fo, delimiter=',')
                     fo_list.append(fo)
                 fn_reader = fn_reader_map[fn]
-                row = next(islice(csv.reader(fo, delimiter=','), row_num))
+                row = next(islice(fn_reader, row_num, row_num + 1))
                 
                 twt_emb = None
                 if len(row) == 2:
