@@ -1,6 +1,7 @@
 import os
 import csv
 import random
+from itertools import islice
 
 import numpy as np
 import torch
@@ -11,7 +12,7 @@ class TweetData(Dataset):
     Put language datasets into PyTorch format
     """
 
-    def __init__(self, emb_dir, batchsz, n_way, k_shot, k_query, lang_only=False, disk_load=False):
+    def __init__(self, emb_dir, batchsz, n_way, k_shot, k_query, mode='', lang_only=False, disk_load=False):
         """
         emb_dir: Directory with the embeddings
         mode: train, dev, or test
@@ -20,6 +21,9 @@ class TweetData(Dataset):
         k_shot
         k_query
 
+        if mode is 'train' then only take 'train' and 'dev' data
+        if mode is 'test' then oly take 'test' data
+            not all languages have explicit test set
         if lang_only then only use language as label, not sentiment
         if disk_load then load samples from disk (used for large dim embeddings)
         """
@@ -179,15 +183,18 @@ class TweetData(Dataset):
 
         # if disk load need to convert twt_data into actual embedding
         if self.disk_load:
-            fn_fo_map = { } # { fn : fo }
+            fo_list = []
+            fn_reader_map = { } # { fn : fo }
             for i, (fn, row_num) in enumerate(flatten_support_x):
                 if fn not in fn_fo_map:
                     fo = open(os.path.join(self.emb_dir, fn), 'r')
-                    fn_fo_map[fn] = fo
+                    fn_reader_map[fn] = csv.reader(fo, delimiter=',')
+                    fo_list.append(fo)
                 fo = fn_fo_map[fn]
-                fo.seek(row_num)
-                row = csv.reader(fo.readline(), delimiter=',')
-                
+                fn_reader = fn_reader_map[fn]
+                row = next(islice(fn_reader, row_num))
+               
+                twt_emb = None
                 if len(row) == 2:
 
                     # non-laser embs
@@ -203,11 +210,13 @@ class TweetData(Dataset):
             for i, (fn, row_num) in enumerate(flatten_query_x):
                 if fn not in fn_fo_map:
                     fo = open(os.path.join(self.emb_dir, fn), 'r')
-                    fn_fo_map[fn] = fo
+                    fn_reader_map[fn] = csv.reader(fo, delimiter=',')
+                    fo_list.append(fo)
                 fo = fn_fo_map[fn]
-                fo.seek(row_num)
-                row = csv.reader(fo.readline(), delimiter=',')
+                fn_reader = fn_reader_map[fn]
+                row = next(islice(csv.reader(fo, delimiter=','), row_num))
                 
+                twt_emb = None
                 if len(row) == 2:
 
                     # non-laser embs
@@ -220,7 +229,7 @@ class TweetData(Dataset):
 
                 flatten_query_x[i] = twt_emb
 
-            for fo in fn_fo_map.values():
+            for fo in fo_list:
                 fo.close()
 
         support_y = np.array([ lbl_idx

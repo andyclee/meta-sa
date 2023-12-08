@@ -209,7 +209,7 @@ class Meta(nn.Module):
 
             with torch.no_grad():
                 pred_q = F.softmax(logits_q, dim=1).argmax(dim=1)
-                print('final pred uniques', torch.unique(pred_q), flush=True)
+                #print('final pred uniques', torch.unique(pred_q), flush=True)
                 correct = torch.eq(pred_q, y_qry).sum().item()  # convert to numpy
                 corrects[k + 1] = corrects[k + 1] + correct
 
