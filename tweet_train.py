@@ -74,10 +74,10 @@ def main(args):
     # batchsz is total episode number
     tweets_train = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
-        batchsz=args.train_batchsz, disk_load=args.disk_load)
+        batchsz=args.train_batchsz, disk_load=args.disk_load, mode='train')
     tweets_test = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
-        batchsz=args.test_batchsz, disk_load=args.disk_load)
+        batchsz=args.test_batchsz, disk_load=args.disk_load, mode='train')
 
     for epoch in range(args.epoch // 10000):
         db = DataLoader(tweets_train, batch_size=args.task_num,
@@ -118,7 +118,30 @@ def main(args):
                     accs_all_test.append(t_accs)
 
                 test_acc = np.array(accs_all_test).mean(axis=0).astype(np.float16)
-                print('Test acc:', test_acc)
+                print('Meta-test acc:', test_acc)
+
+    num_eval_batches = 1000
+    tweet_eval = TweetData(emb_dir,
+        n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
+        batchsz=num_eval_batches, disk_load=args.disk_load, mode='test')
+    tweet_eval_db = DataLoader(tweet_eval, batch_size=1,
+        shuffle=True, num_workers=1, pin_memory=True)
+
+    final_eval_accs = []
+    for e_x_spt, e_y_spt, e_x_qry, e_y_qry in tweet_eval_db:
+        e_x_spt = e_x_spt.squeeze(0).to(device)
+        e_y_spt = e_y_spt.squeeze(0).to(device)
+        e_x_qry = e_x_qry.squeeze(0).to(device)
+        e_y_qry = e_y_qry.squeeze(0).to(device)
+        eval_accs = maml.finetunning(e_x_spt, e_y_spt, e_y_qry, e_y_qry)
+        final_eval_accs.append(eval_accs.mean(axis=0).astype(np.float16))
+
+    print('final evaluation')
+    print('mean acc', np.mean(final_eval_accs))
+    print('median acc', np.median(final_eval_accs))
+    print('std acc', np.std(final_eval_accs))
+    print('max acc', np.max(final_eval_accs))
+    print('min acc', np.min(final_eval_accs))
 
 if __name__ == '__main__':
 

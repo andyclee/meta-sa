@@ -23,7 +23,6 @@ class TweetData(Dataset):
 
         if mode is 'train' then only take 'train' and 'dev' data
         if mode is 'test' then oly take 'test' data
-            not all languages have explicit test set
         if lang_only then only use language as label, not sentiment
         if disk_load then load samples from disk (used for large dim embeddings)
         """
@@ -186,11 +185,10 @@ class TweetData(Dataset):
             fo_list = []
             fn_reader_map = { } # { fn : fo }
             for i, (fn, row_num) in enumerate(flatten_support_x):
-                if fn not in fn_fo_map:
+                if fn not in fn_reader_map:
                     fo = open(os.path.join(self.emb_dir, fn), 'r')
                     fn_reader_map[fn] = csv.reader(fo, delimiter=',')
                     fo_list.append(fo)
-                fo = fn_fo_map[fn]
                 fn_reader = fn_reader_map[fn]
                 row = next(islice(fn_reader, row_num))
                
@@ -208,11 +206,10 @@ class TweetData(Dataset):
                 flatten_support_x[i] = twt_emb
 
             for i, (fn, row_num) in enumerate(flatten_query_x):
-                if fn not in fn_fo_map:
+                if fn not in fn_reader_map:
                     fo = open(os.path.join(self.emb_dir, fn), 'r')
                     fn_reader_map[fn] = csv.reader(fo, delimiter=',')
                     fo_list.append(fo)
-                fo = fn_fo_map[fn]
                 fn_reader = fn_reader_map[fn]
                 row = next(islice(csv.reader(fo, delimiter=','), row_num))
                 
