@@ -83,7 +83,7 @@ class TweetData(Dataset):
 
                         # laser embs
                         twt_emb = [ float(v) for v in row[:-1] ]
-                        sent_lbl = int(row[-1])
+                        sent_lbl = int(float(row[-1]))
                     if self.lang_only:
                         class_lbl = lang
                     elif sent_lbl == -1:

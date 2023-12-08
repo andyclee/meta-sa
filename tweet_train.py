@@ -133,8 +133,8 @@ def main(args):
         e_y_spt = e_y_spt.squeeze(0).to(device)
         e_x_qry = e_x_qry.squeeze(0).to(device)
         e_y_qry = e_y_qry.squeeze(0).to(device)
-        eval_accs = maml.finetunning(e_x_spt, e_y_spt, e_y_qry, e_y_qry)
-        final_eval_accs.append(eval_accs.mean(axis=0).astype(np.float16))
+        eval_accs = maml.finetunning(e_x_spt, e_y_spt, e_x_qry, e_y_qry)
+        final_eval_accs.append(eval_accs.mean(axis=0).astype(np.float16)[-1])
 
     print('final evaluation')
     print('mean acc', np.mean(final_eval_accs))
