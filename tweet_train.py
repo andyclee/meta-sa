@@ -1,5 +1,6 @@
 import os
 import argparse
+import csv
 
 import torch
 import numpy as np
@@ -34,7 +35,7 @@ def main(args):
         ('dense', [128, int(32 * args.embdim / 2)]),
         ('tanh', []),
         #('relu', [False]),
-        ('dropout', [0.5, False]),
+        ('dropout', [0.4, False]),
         ('dense', [args.n_way, 128])
 #        ('softmax', []) # softmax applied in forward/finetunning
     ]
@@ -74,10 +75,15 @@ def main(args):
     # batchsz is total episode number
     tweets_train = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
-        batchsz=args.train_batchsz, disk_load=args.disk_load, mode='train')
+        batchsz=args.train_batchsz, disk_load=args.disk_load,
+        lang_only=args.lang_only, mode='train')
     tweets_test = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
-        batchsz=args.test_batchsz, disk_load=args.disk_load, mode='train')
+        batchsz=args.test_batchsz, disk_load=args.disk_load,
+        lang_only=args.lang_only, mode='train')
+
+    meta_train_accs = []
+    meta_test_accs = []
 
     for epoch in range(args.epoch // 10000):
         db = DataLoader(tweets_train, batch_size=args.task_num,
@@ -101,6 +107,8 @@ def main(args):
 
             accs = maml(x_spt, y_spt, x_qry, y_qry)
 
+            meta_train_accs.append( [epoch, step, accs[-1]] )
+
             if step % 30 == 0:
                 print('step:', step, '\ttraining acc:', accs)
 
@@ -119,11 +127,13 @@ def main(args):
 
                 test_acc = np.array(accs_all_test).mean(axis=0).astype(np.float16)
                 print('Meta-test acc:', test_acc)
+                meta_test_accs.append( [epoch, step, test_acc[-1]] )
 
     num_eval_batches = 1000
     tweet_eval = TweetData(emb_dir,
         n_way=args.n_way, k_shot=args.k_spt, k_query=args.k_qry,
-        batchsz=num_eval_batches, disk_load=args.disk_load, mode='test')
+        batchsz=num_eval_batches, disk_load=args.disk_load,
+        lang_only=args.lang_only, mode='test')
     tweet_eval_db = DataLoader(tweet_eval, batch_size=1,
         shuffle=True, num_workers=1, pin_memory=True)
 
@@ -134,7 +144,8 @@ def main(args):
         e_x_qry = e_x_qry.squeeze(0).to(device)
         e_y_qry = e_y_qry.squeeze(0).to(device)
         eval_accs = maml.finetunning(e_x_spt, e_y_spt, e_x_qry, e_y_qry)
-        final_eval_accs.append(eval_accs.mean(axis=0).astype(np.float16)[-1])
+        print('Eval acc:', eval_accs, flush=True)
+        final_eval_accs.append(eval_accs[-1].astype(np.float16))
 
     print('final evaluation')
     print('mean acc', np.mean(final_eval_accs))
@@ -143,6 +154,31 @@ def main(args):
     print('max acc', np.max(final_eval_accs))
     print('min acc', np.min(final_eval_accs))
 
+    # write out accuracies for plotting
+    emb_str = ''
+    if args.embdim == 100:
+        emb_str = 'ft'
+    elif args.embdim == 1024:
+        emb_str = 'lsr'
+    lang_str = ''
+    if args.lang_only:
+        lang_str = 'lang'
+    else:
+        lang_str = 'sent'
+    acc_fn = '{a}_{e}_{l}_{t}_{k}shot_accs.csv'
+    with open(acc_fn.format(a=args.arch, e=emb_str, l=lang_str, k=args.k_spt, t='train'), 'w+') as tfo:
+        writer = csv.writer(tfo, delimiter=',')
+        for row in meta_train_accs:
+            writer.writerow(row)
+    with open(acc_fn.format(a=args.arch, e=emb_str, l=lang_str, k=args.k_spt, t='test'), 'w+') as tfo:
+        writer = csv.writer(tfo, delimiter=',')
+        for row in meta_test_accs:
+            writer.writerow(row)
+    with open(acc_fn.format(a=args.arch, e=emb_str, l=lang_str, k=args.k_spt, t='eval'), 'w+') as tfo:
+        writer = csv.writer(tfo, delimiter=',')
+        for row in final_eval_accs:
+            writer.writerow(row)
+    
 if __name__ == '__main__':
 
     argparser = argparse.ArgumentParser()
@@ -161,6 +197,7 @@ if __name__ == '__main__':
     argparser.add_argument('--test_batchsz', type=int, help='number of test batches', default=100)
     argparser.add_argument('--arch', type=str, help='cnn or lstm', default='cnn')
     argparser.add_argument('--disk_load', help='load embeddings from disk when needed', action='store_true')
+    argparser.add_argument('--lang_only', help='only classify on languages', action='store_true')
 
     args = argparser.parse_args()
 

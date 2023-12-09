@@ -31,6 +31,7 @@ class TweetData(Dataset):
         self.emb_dir = emb_dir
         self.lang_only = lang_only
         self.disk_load = disk_load
+        self.mode = mode
 
         # User provided params
         self.batchsz = batchsz
@@ -65,25 +66,61 @@ class TweetData(Dataset):
                 continue
             fdata, ext = fn.split('.')
             ftype, lang, dset = fdata.split('_')
-            
+           
+            if self.mode == 'train' and dset == 'test':
+                continue
+            elif self.mode == 'test' and dset in ['train', 'dev']:
+                continue
+ 
             with open(os.path.join(self.emb_dir, fn), 'r') as edfo:
-                csvreader = csv.reader(edfo, delimiter=',')
+                data_iter = None
+                if self.disk_load:
+                    data_iter = edfo
+                else:
+                    data_iter = csv.reader(edfo, delimiter=',')
                 row_num = 0
-                for row in csvreader:
+                while True:
                     twt_emb = []
                     class_lbl = None
 
-                    if len(row) == 2:
-
-                        # non-laser embs
-                        twt_emb = [ float(v) for v in row[0][1:-1].split(' ') if len(v) > 0 ]
-                        twt_emb = np.array(twt_emb)
-                        sent_lbl = int(row[1])
+                    row = None
+                    cur_filepos = None
+                    if self.disk_load:
+                        cur_filepos = data_iter.tell()
+                        row = data_iter.readline()
+                        if len(row) == 0:
+                            break
+                        reader = csv.reader([row], delimiter=',')
+                        row = next(reader)
                     else:
-
+                        try:
+                            row = next(data_iter)
+                        except StopIteration:
+                            break
+                    
+                    twt_data = None
+                    sent_lbl = None
+                    if len(row) == 2:
+                        # fasttext embs
+                        if not self.disk_load:
+                            twt_data = [ float(v) for v in row[0][1:-1].split(' ') if len(v) > 0 ]
+                            twt_data = np.array(twt_data)
+                            sent_lbl = int(row[1])
+                        else:
+                            twt_data = ( fn, cur_filepos )
+                            sent_lbl = int(row[1])
+                            #sent_lbl = 0 if row[-1] == '0' else int(row[-2:])
+                    else:
                         # laser embs
-                        twt_emb = [ float(v) for v in row[:-1] ]
-                        sent_lbl = int(float(row[-1]))
+                        if not self.disk_load:
+                            twt_data = np.array([ float(v) for v in row[:-1] ])
+                            sent_lbl = int(float(row[-1]))
+                        else:
+                            twt_data = ( fn, cur_filepos )
+                            sent_lbl = int(float(row[-1]))
+                            #print('read row', row, flush=True)
+                            #sent_lbl = 0 if row[-1] == '0' else int(row[-2:])
+
                     if self.lang_only:
                         class_lbl = lang
                     elif sent_lbl == -1:
@@ -95,14 +132,10 @@ class TweetData(Dataset):
                     else:
                         raise ValueError
 
-                    if self.disk_load and class_lbl not in dict_labels:
-                        dict_labels[class_lbl] = [ (fn, row_num) ]
-                    elif self.disk_load and class_lbl in dict_labels:
-                        dict_labels[class_lbl].append( (fn, row_num) )
-                    elif not self.disk_load and class_lbl in dict_labels:
-                        dict_labels[class_lbl].append(twt_emb)
+                    if class_lbl in dict_labels:
+                        dict_labels[class_lbl].append(twt_data)
                     else:
-                        dict_labels[class_lbl] = [ twt_emb ]
+                        dict_labels[class_lbl] = [ twt_data ]
 
                     row_num += 1
         return dict_labels
@@ -164,6 +197,44 @@ class TweetData(Dataset):
             self.query_x_batch.append(query_x)
             self.query_y_batch.append(query_y)
         
+    def read_from_disk(self, flat_x, fn_fo_map):
+        # Will change flat_x in place
+        for i, (fn, file_pos) in enumerate(flat_x):
+            if fn not in fn_fo_map:
+                fo = open(os.path.join(self.emb_dir, fn), 'r')
+                fn_fo_map[fn] = fo 
+            fo = fn_fo_map[fn]
+            fo.seek(int(file_pos))
+            line = fo.readline()
+            row_reader = csv.reader([ line ], delimiter=',')
+            row = next(row_reader)
+ 
+            twt_emb = None
+            if len(row) == 2:
+
+                # non-laser embs
+                twt_emb = [ float(v) for v in row[0][1:-1].split(' ') if len(v) > 0 ]
+                twt_emb = np.array(twt_emb)
+            elif len(row) == 1025:
+
+                # laser embs
+                twt_emb = [ float(v) for v in row[:-1] ]
+            else:
+                print('file', fn, 'pos', file_pos)
+                print(len(row), flush=True)
+                print(row, flush=True)
+                raise ValueError
+
+            if len(twt_emb) != 1024:
+                print('invalid length', flush=True)
+                print('file', fn, 'pos', file_pos)
+                print(len(twt_emb), flush=True)
+                print(row, flush=True)
+
+            flat_x[i] = twt_emb
+
+        return flat_x, fn_fo_map
+
     def __getitem__(self, idx):
         """
         Get the idx indexed batch from the full data
@@ -182,51 +253,12 @@ class TweetData(Dataset):
 
         # if disk load need to convert twt_data into actual embedding
         if self.disk_load:
-            fo_list = []
-            fn_reader_map = { } # { fn : fo }
-            for i, (fn, row_num) in enumerate(flatten_support_x):
-                if fn not in fn_reader_map:
-                    fo = open(os.path.join(self.emb_dir, fn), 'r')
-                    fn_reader_map[fn] = csv.reader(fo, delimiter=',')
-                    fo_list.append(fo)
-                fn_reader = fn_reader_map[fn]
-                row = next(islice(fn_reader, row_num, row_num + 1))
-               
-                twt_emb = None
-                if len(row) == 2:
+            fn_fo_map = { } # { fn : fo }
 
-                    # non-laser embs
-                    twt_emb = [ float(v) for v in row[0][1:-1].split(' ') if len(v) > 0 ]
-                    twt_emb = np.array(twt_emb)
-                else:
+            flatten_support_x, fn_fo_map = self.read_from_disk(flatten_support_x, fn_fo_map)
+            flatten_query_x, fn_fo_map = self.read_from_disk(flatten_query_x, fn_fo_map)
 
-                    # laser embs
-                    twt_emb = [ float(v) for v in row[:-1] ]
-
-                flatten_support_x[i] = twt_emb
-
-            for i, (fn, row_num) in enumerate(flatten_query_x):
-                if fn not in fn_reader_map:
-                    fo = open(os.path.join(self.emb_dir, fn), 'r')
-                    fn_reader_map[fn] = csv.reader(fo, delimiter=',')
-                    fo_list.append(fo)
-                fn_reader = fn_reader_map[fn]
-                row = next(islice(fn_reader, row_num, row_num + 1))
-                
-                twt_emb = None
-                if len(row) == 2:
-
-                    # non-laser embs
-                    twt_emb = [ float(v) for v in row[0][1:-1].split(' ') if len(v) > 0 ]
-                    twt_emb = np.array(twt_emb)
-                else:
-
-                    # laser embs
-                    twt_emb = [ float(v) for v in row[:-1] ]
-
-                flatten_query_x[i] = twt_emb
-
-            for fo in fo_list:
+            for fo in fn_fo_map.values():
                 fo.close()
 
         support_y = np.array([ lbl_idx
@@ -244,6 +276,14 @@ class TweetData(Dataset):
             np.array(flatten_support_x).reshape((self.setsz, 1, emb_size))
         )
         # [ n_way * k_query (querysz) , 1, emb_size ]
+        #print('query shape', np.array(flatten_query_x).shape, flush=True)
+        #print('query x elem type', type(flatten_query_x[0]), flush=True)
+        #print('query x elem [0] type', type(flatten_query_x[0][0]), flush=True)
+        for vec in flatten_query_x:
+            if len(vec) != 1024:
+                print(flatten_query_x, flush=True)
+            assert len(vec) == 1024
+        #print('queryx elem size', len(flatten_query_x[0]), flush=True)
         query_x = torch.FloatTensor(
             np.array(flatten_query_x).reshape((self.querysz, 1, emb_size))
         )

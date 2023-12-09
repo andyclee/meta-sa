@@ -13,7 +13,7 @@ DATA_DIR=embs
 EMBDIM=100
 
 N_WAY=5
-K_SPT=1
+K_SPT=5
 K_QRY=15
 TASK_NUM=4
 META_LR=0.001
@@ -27,7 +27,7 @@ TEST_BATCHSZ=100
 
 ARCH=lstm
 
-python3 lang_tweet_train.py --epoch ${EPOCH} \
+python3 tweet_train.py --epoch ${EPOCH} \
         --n_way ${N_WAY} \
         --k_spt ${K_SPT} \
         --k_qry ${K_QRY} \
@@ -40,4 +40,5 @@ python3 lang_tweet_train.py --epoch ${EPOCH} \
         --data_dir "${DATA_DIR}" \
         --train_batchsz ${TRAIN_BATCHSZ} \
         --test_batchsz ${TEST_BATCHSZ} \
-        --arch ${ARCH}
+        --arch ${ARCH} \
+        --lang_only
