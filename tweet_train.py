@@ -177,7 +177,7 @@ def main(args):
     with open(acc_fn.format(a=args.arch, e=emb_str, l=lang_str, k=args.k_spt, t='eval'), 'w+') as tfo:
         writer = csv.writer(tfo, delimiter=',')
         for row in final_eval_accs:
-            writer.writerow(row)
+            writer.writerow([row])
     
 if __name__ == '__main__':
 

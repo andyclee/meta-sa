@@ -225,11 +225,11 @@ class TweetData(Dataset):
                 print(row, flush=True)
                 raise ValueError
 
-            if len(twt_emb) != 1024:
-                print('invalid length', flush=True)
-                print('file', fn, 'pos', file_pos)
-                print(len(twt_emb), flush=True)
-                print(row, flush=True)
+            #if len(twt_emb) != 1024:
+            #    print('invalid length', flush=True)
+            #    print('file', fn, 'pos', file_pos)
+            #    print(len(twt_emb), flush=True)
+            #    print(row, flush=True)
 
             flat_x[i] = twt_emb
 
@@ -279,10 +279,10 @@ class TweetData(Dataset):
         #print('query shape', np.array(flatten_query_x).shape, flush=True)
         #print('query x elem type', type(flatten_query_x[0]), flush=True)
         #print('query x elem [0] type', type(flatten_query_x[0][0]), flush=True)
-        for vec in flatten_query_x:
-            if len(vec) != 1024:
-                print(flatten_query_x, flush=True)
-            assert len(vec) == 1024
+        #for vec in flatten_query_x:
+        #    if len(vec) != 1024:
+        #        print(flatten_query_x, flush=True)
+        #    assert len(vec) == 1024
         #print('queryx elem size', len(flatten_query_x[0]), flush=True)
         query_x = torch.FloatTensor(
             np.array(flatten_query_x).reshape((self.querysz, 1, emb_size))
